@@ -24,7 +24,7 @@
 /// 'err_type': error description type of `Message`, example: `byte`
 ///
 /// # Return
-/// [`Ok(bytes::Bytes)`] or [`Err(Error)`], 
+/// [`Ok(bytes::Bytes)`] or [`Err(Error)`],
 /// error ocurred either if $reader.read_buf returning Err or real length read from $reader is not equeal to $len
 macro_rules! read_from_reader {
     ($len: expr, $reader: expr, $err_type: expr) => {
