@@ -1,7 +1,6 @@
-use std::cell::Cell;
 use std::fmt::Display;
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use tokio::net::TcpStream;
 
 #[macro_use]
@@ -13,7 +12,7 @@ const MESSAGE_TYPE_BYTE_LENGTH: usize = 1;
 const MESSAGE_USERNAME_LENGTH_BYTE_LENGTH: usize = 1;
 const MESSAGE_BODY_LENGTH_BYTE_LENGTH: usize = 4;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Error {
     pub description: String,
 }
@@ -34,19 +33,30 @@ impl Display for Error {
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// representing single message sent from client
+/// representing single message
 ///
 /// constructed from TcpStream use [`Message::from_tcp_stream`]
 pub struct Message {
-    message_type: Bytes,
-    _message_type: Cell<Option<MessageType>>,
-    username_length: Bytes,
-    username: Bytes,
-    body_length: Bytes,
-    body: Bytes,
+    pub message_type: MessageType,
+    username_length: u8,
+    pub username: String,
+    body_length: u32,
 }
 
 impl Message {
+
+    pub fn new(message_type: MessageType, username: String) -> Self {
+        let username_length = username.len() as u8;
+        let body_length = message_type.body_length();
+
+        Message {
+            message_type,
+            username,
+            username_length,
+            body_length
+        }
+    }
+
     pub async fn from_tcp_stream(tcp_stream: &mut TcpStream) -> Result<Self> {
         let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
 
@@ -61,24 +71,30 @@ impl Message {
         let body = read_from_reader!(body_length.len(), tcp_stream, "body").await?;
 
         Ok(Message {
-            message_type,
-            _message_type: Cell::new(None),
-            username_length,
-            username,
-            body_length,
-            body,
+            message_type: Message::get_message_type(message_type, body),
+            username_length: Message::get_username_length(username_length),
+            username: Message::get_username(username),
+            body_length: Message::get_body_length(body_length),
         })
     }
 
-    pub fn get_message_type(&self) -> MessageType {
-        let cache_message_type = self._message_type.get();
-        if let Some(message_type) = cache_message_type {
-            return message_type;
-        }
-
-        let message_type = MessageType::parse(&self.message_type).unwrap();
-        self._message_type.set(Some(message_type));
+    fn get_message_type(byte: Bytes, body: Bytes) -> MessageType {
+        let message_type = MessageType::parse(*byte.first().unwrap(), body).unwrap();
 
         message_type
+    }
+
+    fn get_username_length(bytes: Bytes) -> u8 {
+        let mut b = bytes;
+        b.get_u8()
+    }
+
+    fn get_username(bytes: Bytes) -> String {
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    fn get_body_length(bytes: Bytes) -> u32 {
+        let mut b = bytes;
+        b.get_u32()
     }
 }

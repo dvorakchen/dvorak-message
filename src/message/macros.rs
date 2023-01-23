@@ -2,19 +2,6 @@
 ///
 /// The `read_from_reader!` macro must be used inside of async function
 ///
-/// # Example:
-/// ```
-/// use tokio::net::TcpListener;
-///
-/// let tcp = TcpListener::bind("127.0.0.1:9999").await.unwrap();
-/// let mut tcp_stream = tcp.accept().await.unwrap();
-/// const READ_LENGTH: usize = 1;
-///
-/// let data = read_from_reader!(READ_LENGTH, tcp_stream, "error message type");
-///
-/// assert_eq!(READ_LENGTH, data.len());
-/// ```
-///
 /// # Parameters
 ///
 /// 'len': how many bytes would read
