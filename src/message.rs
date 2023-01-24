@@ -6,7 +6,7 @@ use tokio::net::TcpStream;
 #[macro_use]
 mod macros;
 mod message_type;
-use message_type::MessageType;
+pub use message_type::MessageType;
 
 const MESSAGE_TYPE_BYTE_LENGTH: usize = 1;
 const MESSAGE_USERNAME_LENGTH_BYTE_LENGTH: usize = 1;
@@ -44,7 +44,6 @@ pub struct Message {
 }
 
 impl Message {
-
     pub fn new(message_type: MessageType, username: String) -> Self {
         let username_length = username.len() as u8;
         let body_length = message_type.body_length();
@@ -53,7 +52,7 @@ impl Message {
             message_type,
             username,
             username_length,
-            body_length
+            body_length,
         }
     }
 
@@ -90,11 +89,55 @@ impl Message {
     }
 
     fn get_username(bytes: Bytes) -> String {
-        String::from_utf8(bytes.to_vec()).unwrap()
+        String::from_utf8(bytes.into()).unwrap()
     }
 
     fn get_body_length(bytes: Bytes) -> u32 {
         let mut b = bytes;
         b.get_u32()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_message_type_success() {
+        let test_body: &str = "test Test";
+        let b = Bytes::from(&[1u8][..]);
+        let body = Bytes::from(test_body);
+
+        let res = Message::get_message_type(b, body);
+
+        assert_eq!(res, MessageType::Text(String::from(test_body)));
+    }
+
+    #[test]
+    fn get_unername_length_success() {
+        const LEN: u8 = 123u8;
+        let byte = Bytes::from(&[LEN][..]);
+        let res = Message::get_username_length(byte);
+
+        assert_eq!(LEN, res);
+    }
+
+    #[test]
+    fn get_unername_success() {
+        const USERNAME: &str = "DVORAK";
+        let bytes = Bytes::from(USERNAME);
+
+        let res = Message::get_username(bytes);
+
+        assert_eq!(USERNAME, res);
+    }
+
+    #[test]
+    fn get_body_length() {
+        let bytes = Bytes::from(&[0u8, 0u8, 1u8, 1u8][..]);
+
+        let res = Message::get_body_length(bytes);
+
+        assert_eq!(257, res);
     }
 }
