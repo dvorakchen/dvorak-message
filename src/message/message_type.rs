@@ -24,6 +24,12 @@ impl MessageType {
             MessageType::Text(body) => body.len() as u32,
         }
     }
+
+    pub fn as_bytes(&self) -> ([u8; 1], Bytes) {
+        match self {
+            MessageType::Text(body) => ([1], Bytes::from(body.clone()))
+        }
+    }
 }
 
 #[cfg(test)]

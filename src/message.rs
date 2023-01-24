@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use bytes::{Buf, Bytes};
-use tokio::net::TcpStream;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 #[macro_use]
 mod macros;
@@ -56,6 +56,22 @@ impl Message {
         }
     }
 
+    pub async fn send(tcp_stream: &mut TcpStream, message: Message) -> Result<()> {
+        let mut bytes = message.to_bytes();
+
+        let res = tcp_stream.write_buf(&mut bytes).await;
+
+        if let Ok(size) = res {
+            if size == bytes.len() {
+                return Ok(());
+            } else {
+                return Err(Error::new("send failure"));
+            }
+        } else {
+            return Err(Error::new(res.unwrap_err().kind().to_string().as_str()));
+        }
+    }
+
     pub async fn from_tcp_stream(tcp_stream: &mut TcpStream) -> Result<Self> {
         let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
 
@@ -69,12 +85,23 @@ impl Message {
 
         let body = read_from_reader!(body_length.len(), tcp_stream, "body").await?;
 
-        Ok(Message {
+        let message = Message {
             message_type: Message::get_message_type(message_type, body),
             username_length: Message::get_username_length(username_length),
             username: Message::get_username(username),
             body_length: Message::get_body_length(body_length),
-        })
+        };
+
+        if message.varify() {
+            Ok(message)
+        } else {
+            Err(Error::new("cannot get the correct message"))
+        }
+    }
+
+    pub fn varify(&self) -> bool {
+        self.username_length as usize == self.username.len()
+            && self.message_type.body_length() == self.body_length
     }
 
     fn get_message_type(byte: Bytes, body: Bytes) -> MessageType {
@@ -95,6 +122,23 @@ impl Message {
     fn get_body_length(bytes: Bytes) -> u32 {
         let mut b = bytes;
         b.get_u32()
+    }
+
+    fn to_bytes(self) -> Bytes {
+        let (message_type, body) = self.message_type.as_bytes();
+        let username = Bytes::from(self.username.clone());
+        let username_length = self.username_length;
+        let body_length = body.len() as u32;
+
+        let capacity_length = message_type.len() + body.len() + username.len() + 2;
+        let mut bytes = BytesMut::with_capacity(capacity_length);
+        bytes.put(&message_type[..]);
+        bytes.put_u8(username_length);
+        bytes.put(username);
+        bytes.put_u32(body_length);
+        bytes.put(body);
+
+        bytes.freeze()
     }
 }
 
@@ -139,5 +183,26 @@ mod tests {
         let res = Message::get_body_length(bytes);
 
         assert_eq!(257, res);
+    }
+
+    #[test]
+    fn to_bytes_success() {
+        let username = String::from("dvorak");
+        let body = String::from("test body");
+        let message_type = MessageType::Text(body.clone());
+
+        let message = Message::new(message_type, username.clone());
+        let bytes = message.to_bytes();
+
+        let expected_username_len = username.as_bytes().len() as u8;
+        let expected_username = username.as_bytes();
+        let mut expected_bytes = BytesMut::with_capacity(bytes.len());
+        expected_bytes.put_u8(1u8);
+        expected_bytes.put_u8(expected_username_len);
+        expected_bytes.put(expected_username);
+        expected_bytes.put_u32(body.as_bytes().len() as u32);
+        expected_bytes.put(body.as_bytes());
+
+        assert_eq!(expected_bytes, bytes);
     }
 }
