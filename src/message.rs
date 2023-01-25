@@ -1,3 +1,7 @@
+//! wrap the data into 'message'
+//! 
+//! >> availabe on **crate feature message** only.
+
 use std::fmt::Display;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
