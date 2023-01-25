@@ -1,6 +1,15 @@
 //! wrap the data into 'message'
 //! 
 //! >> availabe on **crate feature message** only.
+//! 
+//! # Wrap data
+//! the `message` will send and receive data with the format belowing:
+//! 1 byte as message type at first, and then 1 byte as username length, 
+//! and then bytes as length of username, and then 4 bytes as body content length,
+//! and then bytes as body
+//! 
+//! |1 byte(indicated message type)|1 byte(indicated username length)|bytes, length depended in username length(indicated username who sending)|
+//! |4 bytes(indicated body length)|bytes, length depended in body content length(indicated body which communicating)|
 
 use std::fmt::Display;
 
