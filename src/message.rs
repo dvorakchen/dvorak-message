@@ -74,17 +74,18 @@ impl Message {
     pub async fn send(tcp_stream: &mut (impl AsyncWriteExt + std::marker::Unpin), message: Message) -> Result<()> {
         let mut bytes = message.to_bytes();
 
-        let res = tcp_stream.write_buf(&mut bytes).await;
+        let res = tcp_stream.write_buf(&mut bytes).await.unwrap();
+        Ok(())
 
-        if let Ok(size) = res {
-            if size == bytes.len() {
-                return Ok(());
-            } else {
-                return Err(Error::new("send failure"));
-            }
-        } else {
-            return Err(Error::new(res.unwrap_err().kind().to_string().as_str()));
-        }
+        // if let Ok(size) = res {
+        //     if size == bytes.len() {
+        //         return Ok(());
+        //     } else {
+        //         return Err(Error::new("send failure"));
+        //     }
+        // } else {
+        //     return Err(Error::new(res.unwrap_err().kind().to_string().as_str()));
+        // }
     }
 
     pub async fn read_tcp_stream(tcp_stream: &mut (impl AsyncReadExt + std::marker::Unpin)) -> Result<Self> {
