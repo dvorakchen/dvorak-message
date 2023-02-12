@@ -14,8 +14,8 @@
 use std::fmt::Display;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use tokio::{io::{AsyncWriteExt}, net::TcpStream};
-use tokio::net::tcp::{ReadHalf, WriteHalf};
+use tokio::net::TcpStream;
+use tokio::io::AsyncWriteExt;
 
 #[macro_use]
 mod macros;
@@ -70,7 +70,7 @@ impl Message {
         }
     }
 
-    pub async fn send(tcp_stream: &mut WriteHalf<'_>, message: Message) -> Result<()> {
+    pub async fn send(tcp_stream: &mut TcpStream, message: Message) -> Result<()> {
         let mut bytes = message.to_bytes();
 
         let res = tcp_stream.write_buf(&mut bytes).await;
@@ -87,24 +87,17 @@ impl Message {
     }
 
     pub async fn from_tcp_stream(tcp_stream: &mut TcpStream) -> Result<Self> {
-
-        let (mut read_half, _) = tcp_stream.split();
-
-        return Self::from_read_half(&mut read_half).await;
-    }
-
-    pub async fn from_read_half(read_half: &mut ReadHalf<'_>) -> Result<Self> {
-        let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, read_half, "type").await?;
+        let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
 
         let username_length =
-            read_from_reader!(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, read_half, "length").await?;
+            read_from_reader!(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, tcp_stream, "length").await?;
 
-        let username = read_from_reader!(username_length.len(), read_half, "username").await?;
+        let username = read_from_reader!(username_length.len(), tcp_stream, "username").await?;
 
         let body_length =
-            read_from_reader!(MESSAGE_BODY_LENGTH_BYTE_LENGTH, read_half, "body length").await?;
+            read_from_reader!(MESSAGE_BODY_LENGTH_BYTE_LENGTH, tcp_stream, "body length").await?;
 
-        let body = read_from_reader!(body_length.len(), read_half, "body").await?;
+        let body = read_from_reader!(body_length.len(), tcp_stream, "body").await?;
 
         let message = Message {
             message_type: Message::get_message_type(message_type, body),
