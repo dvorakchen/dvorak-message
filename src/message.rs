@@ -15,13 +15,13 @@ use std::fmt::Display;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 // use tokio::net::TcpStream;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
 #[macro_use]
 mod macros;
 mod message_type;
 pub use message_type::MessageType;
-use tokio::net::tcp::{ReadHalf, WriteHalf};
+// use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 const MESSAGE_TYPE_BYTE_LENGTH: usize = 1;
 const MESSAGE_USERNAME_LENGTH_BYTE_LENGTH: usize = 1;
@@ -71,7 +71,7 @@ impl Message {
         }
     }
 
-    pub async fn send(tcp_stream: &mut WriteHalf<'_>, message: Message) -> Result<()> {
+    pub async fn send(tcp_stream: &mut (impl AsyncWriteExt + std::marker::Unpin), message: Message) -> Result<()> {
         let mut bytes = message.to_bytes();
 
         let res = tcp_stream.write_buf(&mut bytes).await;
@@ -87,7 +87,7 @@ impl Message {
         }
     }
 
-    pub async fn read_tcp_stream(tcp_stream: &mut ReadHalf<'_>) -> Result<Self> {
+    pub async fn read_tcp_stream(tcp_stream: &mut (impl AsyncReadExt + std::marker::Unpin)) -> Result<Self> {
         let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
 
         let username_length =
