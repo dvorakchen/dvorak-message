@@ -1,13 +1,13 @@
 //! wrap the data into 'message'
-//! 
+//!
 //! >> availabe on **crate feature message** only.
-//! 
+//!
 //! # Wrap data
 //! the `message` will send and receive data with the format belowing:
-//! 1 byte as message type at first, and then 1 byte as username length, 
+//! 1 byte as message type at first, and then 1 byte as username length,
 //! and then bytes as length of username, and then 4 bytes as body content length,
 //! and then bytes as body
-//! 
+//!
 //! |1 byte(indicated message type)|1 byte(indicated username length)|bytes, length depended in username length(indicated username who sending)|
 //! |4 bytes(indicated body length)|bytes, length depended in body content length(indicated body which communicating)|
 
@@ -15,7 +15,7 @@ use std::fmt::Display;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 // use tokio::net::TcpStream;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[macro_use]
 mod macros;
@@ -71,10 +71,13 @@ impl Message {
         }
     }
 
-    pub async fn send(tcp_stream: &mut (impl AsyncWriteExt + std::marker::Unpin), message: Message) -> Result<()> {
-        let mut bytes = message.to_bytes();
+    pub async fn send(
+        tcp_stream: &mut (impl AsyncWriteExt + std::marker::Unpin),
+        message: String,
+    ) -> Result<()> {
+        let mut bytes = message.as_bytes();
 
-        let res = tcp_stream.write_buf(&mut bytes).await.unwrap();
+        tcp_stream.write_buf(&mut bytes).await.unwrap();
         Ok(())
 
         // if let Ok(size) = res {
@@ -88,27 +91,37 @@ impl Message {
         // }
     }
 
-    pub async fn read_tcp_stream(tcp_stream: &mut (impl AsyncReadExt + std::marker::Unpin)) -> Result<Self> {
-        let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
+    pub async fn read_tcp_stream(
+        tcp_stream: &mut (impl AsyncReadExt + std::marker::Unpin),
+    ) -> Result<Self> {
+        // let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
 
-        let username_length =
-            read_from_reader!(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, tcp_stream, "length").await?;
+        // let username_length =
+        //     read_from_reader!(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, tcp_stream, "length").await?;
 
-        let username = read_from_reader!(username_length.len(), tcp_stream, "username").await?;
+        // let username = read_from_reader!(username_length.len(), tcp_stream, "username").await?;
 
-        let body_length =
-            read_from_reader!(MESSAGE_BODY_LENGTH_BYTE_LENGTH, tcp_stream, "body length").await?;
+        // let body_length =
+        //     read_from_reader!(MESSAGE_BODY_LENGTH_BYTE_LENGTH, tcp_stream, "body length").await?;
 
-        let body = read_from_reader!(body_length.len(), tcp_stream, "body").await?;
+        // let body = read_from_reader!(body_length.len(), tcp_stream, "body").await?;
 
-        let message = Message {
-            message_type: Message::get_message_type(message_type, body),
-            username_length: Message::get_username_length(username_length),
-            username: Message::get_username(username),
-            body_length: Message::get_body_length(body_length),
-        };
+        // let message = Message {
+        //     message_type: Message::get_message_type(message_type, body),
+        //     username_length: Message::get_username_length(username_length),
+        //     username: Message::get_username(username),
+        //     body_length: Message::get_body_length(body_length),
+        // };
 
-        Ok(message)
+        let mut data = BytesMut::with_capacity(512);
+        tcp_stream.read_buf(&mut data).await.unwrap();
+
+        Ok(Message {
+            message_type: MessageType::Text(String::from_utf8(data.to_vec()).unwrap()),
+            username_length: 1,
+            username: "dvo".to_string(),
+            body_length: 1,
+        })
         // if message.varify() {
         //     Ok(message)
         // } else {
