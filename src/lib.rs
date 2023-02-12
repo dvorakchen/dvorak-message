@@ -4,14 +4,14 @@
 //! # Usage
 //! 
 //! use full features
-//! ```
-//! dvorak-message = { version = "*", features = ["full"]}
-//! ```
+//! 
+//! dvorak_message = { version = "*", features = ["full"]}
+//! 
 //! 
 //! or particular feature
-//! ```
-//! dvorak-message = { version = "*", features = ["message"]}
-//! ```
+//! 
+//! dvorak_message = { version = "*", features = ["message"]}
+//! 
 //! 
 //! # Features
 //! - message: wrap the data into Massage, and allow both send and receive
