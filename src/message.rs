@@ -107,11 +107,12 @@ impl Message {
             body_length: Message::get_body_length(body_length),
         };
 
-        if message.varify() {
-            Ok(message)
-        } else {
-            Err(Error::new("cannot get the correct message"))
-        }
+        Ok(message)
+        // if message.varify() {
+        //     Ok(message)
+        // } else {
+        //     Err(Error::new("cannot get the correct message"))
+        // }
     }
 
     pub fn varify(&self) -> bool {
