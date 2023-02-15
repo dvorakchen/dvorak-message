@@ -17,8 +17,6 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 // use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-#[macro_use]
-mod macros;
 mod message_type;
 pub use message_type::MessageType;
 // use tokio::net::tcp::{ReadHalf, WriteHalf};
@@ -65,68 +63,69 @@ impl Message {
 
         Message {
             message_type,
-            username,
             username_length,
+            username,
             body_length,
         }
     }
 
     pub async fn send(
         tcp_stream: &mut (impl AsyncWriteExt + std::marker::Unpin),
-        message: String,
+        message: Self,
     ) -> Result<()> {
-        let mut bytes = message.as_bytes();
+        let mut bytes = message.to_bytes();
 
         tcp_stream.write_buf(&mut bytes).await.unwrap();
         Ok(())
-
-        // if let Ok(size) = res {
-        //     if size == bytes.len() {
-        //         return Ok(());
-        //     } else {
-        //         return Err(Error::new("send failure"));
-        //     }
-        // } else {
-        //     return Err(Error::new(res.unwrap_err().kind().to_string().as_str()));
-        // }
     }
 
-    pub async fn read_tcp_stream(
-        tcp_stream: &mut (impl AsyncReadExt + std::marker::Unpin),
-    ) -> Result<Self> {
-        // let message_type = read_from_reader!(MESSAGE_TYPE_BYTE_LENGTH, tcp_stream, "type").await?;
+    pub async fn read_from(stream: &mut (impl AsyncReadExt + Unpin)) -> Result<Option<Self>> {
+        let mut bytes = BytesMut::with_capacity(512);
 
-        // let username_length =
-        //     read_from_reader!(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, tcp_stream, "length").await?;
+        let len = stream.read_buf(&mut bytes).await.map_err(|e| {
+            let description = format!("read message failure: {}", e.kind());
+            Error {
+                description: String::from(description),
+            }
+        })?;
 
-        // let username = read_from_reader!(username_length.len(), tcp_stream, "username").await?;
+        if len == 0 {
+            return Ok(None);
+        }
 
-        // let body_length =
-        //     read_from_reader!(MESSAGE_BODY_LENGTH_BYTE_LENGTH, tcp_stream, "body length").await?;
+        Message::varify_len(MESSAGE_TYPE_BYTE_LENGTH, bytes.len())?;
+        let message_type = bytes.get_u8();
+        Message::varify_len(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, bytes.len())?;
+        let username_len = bytes.get_u8();
+        Message::varify_len(username_len as usize, bytes.len())?;
+        let username = bytes.split_to(username_len as usize);
+        let username = String::from_utf8(username.to_vec()).unwrap();
+        Message::varify_len(MESSAGE_BODY_LENGTH_BYTE_LENGTH, bytes.len())?;
+        let body_len = bytes.get_u32();
+        Message::varify_len(body_len as usize, bytes.len())?;
+        let body = bytes.split_to(body_len as usize);
 
-        // let body = read_from_reader!(body_length.len(), tcp_stream, "body").await?;
+        Ok(Some(Message {
+            message_type: MessageType::parse(message_type, body.freeze()).unwrap(),
+            username_length: username_len,
+            username,
+            body_length: body_len,
+        }))
 
-        // let message = Message {
-        //     message_type: Message::get_message_type(message_type, body),
-        //     username_length: Message::get_username_length(username_length),
-        //     username: Message::get_username(username),
-        //     body_length: Message::get_body_length(body_length),
-        // };
+        // MessageType::parse(message_type, body);
+    }
 
-        let mut data = BytesMut::with_capacity(512);
-        tcp_stream.read_buf(&mut data).await.unwrap();
-
-        Ok(Message {
-            message_type: MessageType::Text(String::from_utf8(data.to_vec()).unwrap()),
-            username_length: 1,
-            username: "dvo".to_string(),
-            body_length: 1,
-        })
-        // if message.varify() {
-        //     Ok(message)
-        // } else {
-        //     Err(Error::new("cannot get the correct message"))
-        // }
+    fn varify_len(expect_len: usize, actual_len: usize) -> Result<()> {
+        if actual_len < expect_len {
+            Err(Error {
+                description: String::from(format!(
+                    "actual length {} lower than expect length {}",
+                    actual_len, expect_len
+                )),
+            })
+        } else {
+            Ok(())
+        }
     }
 
     pub fn varify(&self) -> bool {
@@ -234,5 +233,28 @@ mod tests {
         expected_bytes.put(body.as_bytes());
 
         assert_eq!(expected_bytes, bytes);
+    }
+
+    #[tokio::test]
+    async fn read_from_duplex_stream() {
+        let (mut client, mut server) = tokio::io::duplex(64);
+        
+        let username = String::from("dvorak");
+        let body = String::from("test body");
+        let message_type = MessageType::Text(body.clone());
+
+        let message = Message::new(message_type, username.clone());
+        let mut message_bytes = message.to_bytes();
+        let expected_len = message_bytes.len();
+
+        let len = client.write_buf(&mut message_bytes).await.unwrap();
+        assert_eq!(len, expected_len);
+
+        let message = Message::read_from(&mut server).await.unwrap().unwrap();
+
+        assert_eq!(message.body_length as usize, body.len());
+        assert_eq!(message.message_type, MessageType::Text(body));
+        assert_eq!(message.username_length as usize, username.len());
+        assert_eq!(message.username, username);
     }
 }
