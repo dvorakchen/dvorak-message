@@ -14,16 +14,15 @@
 use std::fmt::Display;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-// use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 mod message_type;
 pub use message_type::MessageType;
-// use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 const MESSAGE_TYPE_BYTE_LENGTH: usize = 1;
 const MESSAGE_USERNAME_LENGTH_BYTE_LENGTH: usize = 1;
 const MESSAGE_BODY_LENGTH_BYTE_LENGTH: usize = 4;
+const DEFAULT_BUFFER_CAPACITY: usize = 512;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Error {
@@ -80,7 +79,7 @@ impl Message {
     }
 
     pub async fn read_from(stream: &mut (impl AsyncReadExt + Unpin)) -> Result<Option<Self>> {
-        let mut bytes = BytesMut::with_capacity(512);
+        let mut bytes = BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY);
 
         let len = stream.read_buf(&mut bytes).await.map_err(|e| {
             let description = format!("read message failure: {}", e.kind());
@@ -106,7 +105,7 @@ impl Message {
         let body = bytes.split_to(body_len as usize);
 
         Ok(Some(Message {
-            message_type: MessageType::parse(message_type, body.freeze()).unwrap(),
+            message_type: MessageType::parse(message_type, Some(body.freeze())).unwrap(),
             username_length: username_len,
             username,
             body_length: body_len,
@@ -128,40 +127,15 @@ impl Message {
         }
     }
 
-    pub fn varify(&self) -> bool {
-        self.username_length as usize == self.username.len()
-            && self.message_type.body_length() == self.body_length
-    }
-
-    fn get_message_type(byte: Bytes, body: Bytes) -> MessageType {
-        let message_type = MessageType::parse(*byte.first().unwrap(), body).unwrap();
-
-        message_type
-    }
-
-    fn get_username_length(bytes: Bytes) -> u8 {
-        let mut b = bytes;
-        b.get_u8()
-    }
-
-    fn get_username(bytes: Bytes) -> String {
-        String::from_utf8(bytes.into()).unwrap()
-    }
-
-    fn get_body_length(bytes: Bytes) -> u32 {
-        let mut b = bytes;
-        b.get_u32()
-    }
-
     fn to_bytes(self) -> Bytes {
-        let (message_type, body) = self.message_type.as_bytes();
+        let body = self.message_type.as_bytes();
         let username = Bytes::from(self.username.clone());
         let username_length = self.username_length;
         let body_length = body.len() as u32;
 
-        let capacity_length = message_type.len() + body.len() + username.len() + 2;
+        let capacity_length = MESSAGE_TYPE_BYTE_LENGTH + body.len() + username.len() + 2;
         let mut bytes = BytesMut::with_capacity(capacity_length);
-        bytes.put(&message_type[..]);
+        bytes.put_u8(self.message_type.value());
         bytes.put_u8(username_length);
         bytes.put(username);
         bytes.put_u32(body_length);
@@ -174,45 +148,6 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn get_message_type_success() {
-        let test_body: &str = "test Test";
-        let b = Bytes::from(&[1u8][..]);
-        let body = Bytes::from(test_body);
-
-        let res = Message::get_message_type(b, body);
-
-        assert_eq!(res, MessageType::Text(String::from(test_body)));
-    }
-
-    #[test]
-    fn get_unername_length_success() {
-        const LEN: u8 = 123u8;
-        let byte = Bytes::from(&[LEN][..]);
-        let res = Message::get_username_length(byte);
-
-        assert_eq!(LEN, res);
-    }
-
-    #[test]
-    fn get_unername_success() {
-        const USERNAME: &str = "DVORAK";
-        let bytes = Bytes::from(USERNAME);
-
-        let res = Message::get_username(bytes);
-
-        assert_eq!(USERNAME, res);
-    }
-
-    #[test]
-    fn get_body_length() {
-        let bytes = Bytes::from(&[0u8, 0u8, 1u8, 1u8][..]);
-
-        let res = Message::get_body_length(bytes);
-
-        assert_eq!(257, res);
-    }
 
     #[test]
     fn to_bytes_success() {
@@ -238,7 +173,7 @@ mod tests {
     #[tokio::test]
     async fn read_from_duplex_stream() {
         let (mut client, mut server) = tokio::io::duplex(64);
-        
+
         let username = String::from("dvorak");
         let body = String::from("test body");
         let message_type = MessageType::Text(body.clone());
