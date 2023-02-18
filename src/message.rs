@@ -52,19 +52,19 @@ pub struct Message {
     pub message_type: MessageType,
     username_length: u8,
     pub username: String,
-    body_length: u32,
+    _body_length: u32,
 }
 
 impl Message {
     pub fn new(message_type: MessageType, username: String) -> Self {
         let username_length = username.len() as u8;
-        let body_length = message_type.body_length();
+        let _body_length = message_type.body_length();
 
         Message {
             message_type,
             username_length,
             username,
-            body_length,
+            _body_length,
         }
     }
 
@@ -108,7 +108,7 @@ impl Message {
             message_type: MessageType::parse(message_type, Some(body.freeze())).unwrap(),
             username_length: username_len,
             username,
-            body_length: body_len,
+            _body_length: body_len,
         }))
 
         // MessageType::parse(message_type, body);
@@ -187,7 +187,7 @@ mod tests {
 
         let message = Message::read_from(&mut server).await.unwrap().unwrap();
 
-        assert_eq!(message.body_length as usize, body.len());
+        assert_eq!(message._body_length as usize, body.len());
         assert_eq!(message.message_type, MessageType::Text(body));
         assert_eq!(message.username_length as usize, username.len());
         assert_eq!(message.username, username);
