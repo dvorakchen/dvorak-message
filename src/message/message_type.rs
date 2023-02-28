@@ -4,9 +4,11 @@ use bytes::Bytes;
 /// representing the MessageType in `Message` protocol first byte
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MessageType {
+    /// no yet use
     Heart,
-    /// indicated the message body as Text
+    /// indicating the message body as Text
     Text(String),
+    /// indicating the action that client connecting first time
     Login,
 }
 
