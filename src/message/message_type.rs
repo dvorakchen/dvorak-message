@@ -7,6 +7,7 @@ pub enum MessageType {
     Heart,
     /// indicated the message body as Text
     Text(String),
+    Login,
 }
 
 impl MessageType {
@@ -15,32 +16,36 @@ impl MessageType {
     /// return ['Ok(MessageType)'] if successfuls
     pub fn parse(value: u8, body: Option<Bytes>) -> Result<Self> {
         match value {
-            0 => Ok(MessageType::Heart),
-            1 => Ok(MessageType::Text(
+            0 => Ok(Self::Heart),
+            1 => Ok(Self::Text(
                 String::from_utf8(body.unwrap().to_vec()).unwrap(),
             )),
+            2 => Ok(Self::Login),
             other => Err(Error::new(&format!("unsupported value: {}", other))),
         }
     }
 
     pub fn body_length(&self) -> u32 {
         match self {
-            MessageType::Heart => 0,
-            MessageType::Text(body) => body.len() as u32,
+            Self::Heart => 0,
+            Self::Text(body) => body.len() as u32,
+            Self::Login => 0,
         }
     }
 
     pub fn as_bytes(&self) -> Bytes {
         match self {
-            MessageType::Heart => Bytes::new(),
-            MessageType::Text(body) => Bytes::from(body.clone()),
+            Self::Heart => Bytes::new(),
+            Self::Text(body) => Bytes::from(body.clone()),
+            Self::Login => Bytes::new()
         }
     }
 
     pub fn value(&self) -> u8 {
         match self {
-            MessageType::Heart => 0,
-            MessageType::Text(_) => 1,
+            Self::Heart => 0,
+            Self::Text(_) => 1,
+            Self::Login => 2
         }
     }
 }

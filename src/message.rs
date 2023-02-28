@@ -114,6 +114,15 @@ impl Message {
         // MessageType::parse(message_type, body);
     }
 
+    /// get the body of message
+    /// return Some(body) if message_type is Text otherwise None
+    pub fn get_body(&self) -> Option<&String> {
+        match &self.message_type {
+            MessageType::Text(body) => Some(body),
+            _ => None
+        }
+    }
+
     fn varify_len(expect_len: usize, actual_len: usize) -> Result<()> {
         if actual_len < expect_len {
             Err(Error {
@@ -191,5 +200,24 @@ mod tests {
         assert_eq!(message.message_type, MessageType::Text(body));
         assert_eq!(message.username_length as usize, username.len());
         assert_eq!(message.username, username);
+    }
+
+    #[test]
+    fn get_body_has_body() {
+        let body = String::from("message body");
+        let username = String::from("uuuusername");
+        let message = Message::new(MessageType::Text(body.clone()), username);
+
+        let body_value = message.get_body();
+        assert_eq!(Some(&body), body_value);
+    }
+
+    #[test]
+    fn get_body_has_no_body() {
+        let username = String::from("uuuusername");
+        let message = Message::new(MessageType::Login, username);
+
+        let body_value = message.get_body();
+        assert_eq!(None, body_value);
     }
 }
