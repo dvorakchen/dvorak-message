@@ -10,6 +10,8 @@ pub enum MessageType {
     Text(String),
     /// indicating the action that client connecting first time
     Login,
+    /// indicating the action that client disconnecting
+    Logout,
 }
 
 impl MessageType {
@@ -23,6 +25,7 @@ impl MessageType {
                 String::from_utf8(body.unwrap().to_vec()).unwrap(),
             )),
             2 => Ok(Self::Login),
+            3 => Ok(Self::Logout),
             other => Err(Error::new(&format!("unsupported value: {}", other))),
         }
     }
@@ -32,6 +35,7 @@ impl MessageType {
             Self::Heart => 0,
             Self::Text(body) => body.len() as u32,
             Self::Login => 0,
+            Self::Logout => 0,
         }
     }
 
@@ -39,7 +43,8 @@ impl MessageType {
         match self {
             Self::Heart => Bytes::new(),
             Self::Text(body) => Bytes::from(body.clone()),
-            Self::Login => Bytes::new()
+            Self::Login => Bytes::new(),
+            Self::Logout => Bytes::new(),
         }
     }
 
@@ -47,7 +52,8 @@ impl MessageType {
         match self {
             Self::Heart => 0,
             Self::Text(_) => 1,
-            Self::Login => 2
+            Self::Login => 2,
+            Self::Logout => 3,
         }
     }
 }

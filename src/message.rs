@@ -111,12 +111,10 @@ impl Message {
             username,
             receiver,
         }))
-
-        // MessageType::parse(message_type, body);
     }
 
     /// get the body of message
-    /// return Some(body) if message_type is Text otherwise None
+    /// return Some(body) if message_type is [`MessageType::Text`] otherwise [`None`]
     pub fn get_body(&self) -> Option<&String> {
         match &self.message_type {
             MessageType::Text(body) => Some(body),
