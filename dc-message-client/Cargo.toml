@@ -1,0 +1,22 @@
+[package]
+name = "dc_message_client"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "^1.0", features = [
+    "rt",
+    "macros",
+    "rt-multi-thread",
+    "net",
+    "io-util",
+    "io-std",
+    "sync"
+] }
+clap = { version = "4.1.4", features = ["derive"] }
+
+dvorak_message = { path = "../dvorak-message", default-features = false, features = [
+    "message"
+]}
