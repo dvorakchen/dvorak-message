@@ -1,3 +1,5 @@
+use tokio::sync::mpsc::{Receiver, Sender};
+
 use crate::client::Client;
 
 use super::client::ClientMessage;
@@ -5,8 +7,7 @@ use super::dctor::Dctor;
 use std::{
     collections::HashMap,
     net::TcpStream,
-    sync::mpsc::{self, Receiver, Sender},
-    thread::{self, JoinHandle},
+    thread::{self, JoinHandle}
 };
 
 /// Actor Message for ClientSupervisor
@@ -36,18 +37,18 @@ struct StoredClient {
 pub struct ClientSupervisor {
     clients: HashMap<String, StoredClient>,
     inbox: Receiver<<Self as Dctor>::InboxItem>,
-    sender: Sender<<Self as Dctor>::InboxItem>,
 }
 
 impl ClientSupervisor {
-    pub fn new() -> Self {
+    pub fn new() -> (Self, Sender<SupervisorMessage>) {
         let (tx, rx) = mpsc::channel();
-
-        ClientSupervisor {
-            clients: HashMap::new(),
-            inbox: rx,
-            sender: tx,
-        }
+        (
+            ClientSupervisor {
+                clients: HashMap::new(),
+                inbox: rx,
+            },
+            tx,
+        )
     }
 }
 
