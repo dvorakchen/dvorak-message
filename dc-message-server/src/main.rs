@@ -1,7 +1,7 @@
 use server::Server;
 
-mod server;
 mod args;
+mod server;
 
 #[tokio::main]
 async fn main() {

@@ -48,16 +48,16 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// representing single message
 ///
 /// constructed from TcpStream use [`Message::read_from`]
-/// 
+///
 /// # Protocol
 /// There is the protocol struct below
-/// 
+///
 /// for example, the `|type(u8)|` representing the 'type' would stored and the length would be `byte`
-/// 
+///
 /// |type(u8)|username_length(u8)|username(username_length)
 /// |receiver_length(u8)|username(receiver_length)
 /// |body_length(u32)|body(body_length)|
-/// 
+///
 pub struct Message {
     pub message_type: MessageType,
     pub username: String,

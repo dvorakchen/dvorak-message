@@ -109,8 +109,8 @@ impl Server {
                 }
                 _ => {
                     println!("Received type: other");
-                    continue
-                },
+                    continue;
+                }
             }
         }
         Ok(())

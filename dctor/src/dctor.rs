@@ -1,4 +1,5 @@
-use std::sync::mpsc::{Sender, Receiver};
+use async_trait::async_trait;
+use tokio::sync::mpsc::Receiver;
 
 #[async_trait]
 pub(crate) trait Dctor {
@@ -7,4 +8,4 @@ pub(crate) trait Dctor {
     async fn listen(&mut self);
 }
 
-pub(crate)type Inbox<T> = Receiver<T>;
+pub(crate) type Inbox<T> = Receiver<T>;

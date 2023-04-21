@@ -1,4 +1,5 @@
-use tokio::sync::mpsc::{Receiver, Sender};
+use async_trait::async_trait;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 use crate::client::Client;
 
@@ -7,7 +8,7 @@ use super::dctor::Dctor;
 use std::{
     collections::HashMap,
     net::TcpStream,
-    thread::{self, JoinHandle}
+    thread::{self, JoinHandle},
 };
 
 /// Actor Message for ClientSupervisor
@@ -41,7 +42,7 @@ pub struct ClientSupervisor {
 
 impl ClientSupervisor {
     pub fn new() -> (Self, Sender<SupervisorMessage>) {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel(100);
         (
             ClientSupervisor {
                 clients: HashMap::new(),
@@ -52,12 +53,13 @@ impl ClientSupervisor {
     }
 }
 
+#[async_trait]
 impl Dctor for ClientSupervisor {
     type InboxItem = SupervisorMessage;
 
     async fn listen(&mut self) {
         use SupervisorMessage::*;
-        while let Ok(msg) = self.inbox.recv().await {
+        while let Some(msg) = self.inbox.recv().await {
             match msg {
                 NewClient(username, tcp_stream) => {
                     let (mut client, client_sender) = Client::new(tcp_stream);
@@ -88,11 +90,11 @@ impl Dctor for ClientSupervisor {
                     receiver
                         .sender
                         .send(ClientMessage::ReceiveMessage(sender, message))
-                        .unwrap();
+                        .await;
                 }
                 DisconnectClient(username) => {
                     if let Some(client) = self.clients.remove(&username) {
-                        client.sender.send(ClientMessage::Terminate).unwrap();
+                        client.sender.send(ClientMessage::Terminate).await;
                     }
                 }
             }
