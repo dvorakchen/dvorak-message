@@ -55,9 +55,9 @@ impl ClientSupervisor {
 impl Dctor for ClientSupervisor {
     type InboxItem = SupervisorMessage;
 
-    fn listen(&mut self) {
+    async fn listen(&mut self) {
         use SupervisorMessage::*;
-        while let Ok(msg) = self.inbox.recv() {
+        while let Ok(msg) = self.inbox.recv().await {
             match msg {
                 NewClient(username, tcp_stream) => {
                     let (mut client, client_sender) = Client::new(tcp_stream);

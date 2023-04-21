@@ -1,9 +1,10 @@
 use std::sync::mpsc::{Sender, Receiver};
 
+#[async_trait]
 pub(crate) trait Dctor {
     type InboxItem;
 
-    fn listen(&mut self);
+    async fn listen(&mut self);
 }
 
 pub(crate)type Inbox<T> = Receiver<T>;
