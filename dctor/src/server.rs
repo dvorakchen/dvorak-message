@@ -1,6 +1,10 @@
-use crate::{dctor::Dctor, supervisor::SupervisorMessage};
+use std::sync::Arc;
+
+use crate::{
+    dctor::Dctor,
+    supervisor::{SupervisorMessage, SupervisorSender},
+};
 use dvorak_message::message::{Message, MessageType};
-use tokio::sync::mpsc::Sender;
 use tokio::{
     net::{TcpListener, TcpStream},
     task::JoinHandle,
@@ -20,7 +24,7 @@ use super::supervisor::ClientSupervisor;
 pub struct Server {
     tcp_listener: TcpListener,
     supervisor_handler: JoinHandle<()>,
-    supervisor_sender: Sender<SupervisorMessage>,
+    supervisor_sender: SupervisorSender,
 }
 
 impl Server {
@@ -30,7 +34,7 @@ impl Server {
         let (mut client_supervisor, supervisor_sender) = ClientSupervisor::new();
 
         let supervisor_handler = tokio::spawn(async move {
-            client_supervisor.listen();
+            client_supervisor.listen().await;
         });
 
         Server {
@@ -62,7 +66,10 @@ impl Server {
             let username = first.unwrap();
             println!("{username} connecting");
 
-            // self.client_supervisor
+            self.supervisor_sender
+                .send(SupervisorMessage::NewClient(username, incoming_client))
+                .await
+                .unwrap();
         }
     }
 

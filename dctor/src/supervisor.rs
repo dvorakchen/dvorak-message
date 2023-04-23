@@ -1,17 +1,20 @@
 use async_trait::async_trait;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::{
+    net::TcpStream,
+    sync::mpsc::{self, Receiver, Sender},
+    task::JoinHandle,
+};
 
 use crate::client::Client;
 
 use super::client::ClientMessage;
 use super::dctor::Dctor;
-use std::{
-    collections::HashMap,
-    net::TcpStream,
-    thread::{self, JoinHandle},
-};
+use std::{collections::HashMap, sync::Arc};
+
+pub type SupervisorSender = Arc<Sender<SupervisorMessage>>;
 
 /// Actor Message for ClientSupervisor
+#[derive(Debug)]
 pub enum SupervisorMessage {
     /// representing a new client established
     /// tuple parameters: (client username, TcpStream)
@@ -27,6 +30,8 @@ pub enum SupervisorMessage {
     },
     /// representing client disconnecting to server
     DisconnectClient(String),
+    /// close all of clients, and this Supervisor
+    Terminate,
 }
 
 struct StoredClient {
@@ -38,17 +43,22 @@ struct StoredClient {
 pub struct ClientSupervisor {
     clients: HashMap<String, StoredClient>,
     inbox: Receiver<<Self as Dctor>::InboxItem>,
+    /// should keep a supervisor sender, for distribute to all clients
+    sender: SupervisorSender,
 }
 
 impl ClientSupervisor {
-    pub fn new() -> (Self, Sender<SupervisorMessage>) {
+    pub fn new() -> (Self, SupervisorSender) {
         let (tx, rx) = mpsc::channel(100);
+        let supervisor_sender = Arc::new(tx);
+
         (
             ClientSupervisor {
                 clients: HashMap::new(),
                 inbox: rx,
+                sender: Arc::clone(&supervisor_sender),
             },
-            tx,
+            supervisor_sender,
         )
     }
 }
@@ -59,13 +69,14 @@ impl Dctor for ClientSupervisor {
 
     async fn listen(&mut self) {
         use SupervisorMessage::*;
-        while let Some(msg) = self.inbox.recv().await {
+        'listen: while let Some(msg) = self.inbox.recv().await {
             match msg {
                 NewClient(username, tcp_stream) => {
-                    let (mut client, client_sender) = Client::new(tcp_stream);
+                    let (mut client, client_sender) =
+                        Client::new(tcp_stream, Arc::clone(&self.sender));
 
-                    let handle = thread::spawn(move || {
-                        client.listen();
+                    let handle = tokio::spawn(async move {
+                        client.listen().await;
                     });
 
                     self.clients.insert(
@@ -90,12 +101,24 @@ impl Dctor for ClientSupervisor {
                     receiver
                         .sender
                         .send(ClientMessage::ReceiveMessage(sender, message))
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 DisconnectClient(username) => {
                     if let Some(client) = self.clients.remove(&username) {
-                        client.sender.send(ClientMessage::Terminate).await;
+                        client.sender.send(ClientMessage::Terminate).await.unwrap();
                     }
+                }
+                Terminate => {
+                    for (_, stored_client) in self.clients.iter_mut() {
+                        stored_client
+                            .sender
+                            .send(ClientMessage::Terminate)
+                            .await
+                            .unwrap();
+                    }
+                    self.clients.clear();
+                    break 'listen;
                 }
             }
         }

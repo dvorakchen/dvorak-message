@@ -1,8 +1,16 @@
-use super::dctor::{Dctor, Inbox};
+use super::{
+    dctor::{Dctor, Inbox},
+    supervisor::SupervisorSender,
+};
 use async_trait::async_trait;
-use std::{io::Write, net::TcpStream};
-use tokio::sync::mpsc::{self, Sender};
+use dvorak_message::message::Message;
+use tokio::{
+    io::AsyncWriteExt,
+    net::TcpStream,
+    sync::mpsc::{self, Sender},
+};
 
+#[derive(Debug)]
 pub(crate) enum ClientMessage {
     /// representing there is a message need send,
     /// tuple parameters: (sender, message)
@@ -14,15 +22,20 @@ pub(crate) enum ClientMessage {
 pub(crate) struct Client {
     tcp_stream: TcpStream,
     inbox: Inbox<<Self as Dctor>::InboxItem>,
+    supervisor_sender: SupervisorSender,
 }
 
 impl Client {
-    pub fn new(tcp_stream: TcpStream) -> (Self, Sender<<Self as Dctor>::InboxItem>) {
+    pub fn new(
+        tcp_stream: TcpStream,
+        supervisor_sender: SupervisorSender,
+    ) -> (Self, Sender<<Self as Dctor>::InboxItem>) {
         let (tx, rx) = mpsc::channel(100);
         (
             Client {
                 tcp_stream,
                 inbox: rx,
+                supervisor_sender,
             },
             tx,
         )
@@ -36,15 +49,23 @@ impl Dctor for Client {
     async fn listen(&mut self) {
         use ClientMessage::*;
 
-        while let Some(msg) = self.inbox.recv().await {
-            match msg {
-                ReceiveMessage(sender, message) => {
-                    let data = format!("{{ sender: '{sender}', message: '{message}' }}");
-                    let buf = data.as_bytes();
-                    self.tcp_stream.write_all(buf).unwrap();
-                }
-                Terminate => {
-                    return;
+        tokio::select! {
+            msg = Message::read_from(&mut self.tcp_stream) => {
+                // let msg = msg.map_err(|_| "read from client failed")
+                //     .ok_or_else(|| "read from client failed");
+            },
+            msg = self.inbox.recv() => {
+                if let Some(msg) = msg {
+                    match msg {
+                        ReceiveMessage(sender, message) => {
+                            let data = format!("{{ sender: '{sender}', message: '{message}' }}");
+                            let buf = data.as_bytes();
+                            self.tcp_stream.write_all(buf).await.unwrap();
+                        }
+                        Terminate => {
+                            return;
+                        }
+                    }
                 }
             }
         }
