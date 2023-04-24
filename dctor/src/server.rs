@@ -37,6 +37,7 @@ impl Server {
             client_supervisor.listen().await;
         });
 
+        println!("Server construct.");
         Server {
             tcp_listener,
             supervisor_handler,
@@ -45,8 +46,11 @@ impl Server {
     }
 
     pub async fn listen(&mut self) {
+        println!("Server Listening...");
         loop {
-            let (mut incoming_client, _) = self.tcp_listener.accept().await.unwrap();
+            let (mut incoming_client, socket) = self.tcp_listener.accept().await.unwrap();
+
+            println!("Client incoming: {socket}");
 
             let first = Server::check_login(&mut incoming_client).await;
             if first.is_err() {
@@ -61,11 +65,11 @@ impl Server {
                 .await
                 .unwrap();
                 continue;
-            }
-
+            };
             let username = first.unwrap();
-            println!("{username} connecting");
+            println!("Client login success: {username}");
 
+            println!("Send message to supervisor");
             self.supervisor_sender
                 .send(SupervisorMessage::NewClient(username, incoming_client))
                 .await

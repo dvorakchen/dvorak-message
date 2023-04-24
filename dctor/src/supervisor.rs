@@ -52,6 +52,7 @@ impl ClientSupervisor {
         let (tx, rx) = mpsc::channel(100);
         let supervisor_sender = Arc::new(tx);
 
+        println!("Supervisor construct");
         (
             ClientSupervisor {
                 clients: HashMap::new(),
@@ -69,7 +70,10 @@ impl Dctor for ClientSupervisor {
 
     async fn listen(&mut self) {
         use SupervisorMessage::*;
+
+        println!("Supervisor listening...");
         'listen: while let Some(msg) = self.inbox.recv().await {
+            println!("Supervisor received message: {:?}", msg);
             match msg {
                 NewClient(username, tcp_stream) => {
                     let (mut client, client_sender) =
