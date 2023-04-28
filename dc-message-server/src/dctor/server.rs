@@ -43,6 +43,8 @@ impl Server {
         }
     }
 
+    /// run and listen the Srver,
+    /// if there are clients incoming, would check login and distribute to [Supervisor]
     pub async fn listen(&mut self) {
         println!("Server Listening...");
         loop {

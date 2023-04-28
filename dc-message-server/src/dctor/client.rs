@@ -18,6 +18,8 @@ pub(crate) enum ClientMessage {
     Terminate,
 }
 
+/// this is the Client Actor.
+/// each Client would keep its owner TcpStream, and keep SupervisorSend who managed it
 pub(crate) struct Client {
     tcp_stream: TcpStream,
     inbox: Inbox<<Self as Dctor>::InboxItem>,
@@ -93,6 +95,7 @@ impl Dctor for Client {
 
         loop {
             tokio::select! {
+                //  someone sent message to current client
                 msg = Message::read_from(&mut self.tcp_stream) => {
                     if msg.is_err() {
                         continue;
@@ -110,15 +113,12 @@ impl Dctor for Client {
                     }
                 },
                 msg = self.inbox.recv() => {
+                    //  current Client Actor received a new ClientMessage
                     if let Some(msg) = msg {
                         match msg {
                             ReceiveMessage(sender, message) => {
                                 let message = Message::new(MessageType::Text(message), sender, String::from("Self"));
                                 Message::send(&mut self.tcp_stream, message).await.unwrap();
-                                // let data = format!("{{ sender: '{sender}', message: '{message}' }}");
-                                // println!("Debug: Client in Server ReceiveMessage: {data}");
-                                // let buf = data.as_bytes();
-                                // self.tcp_stream.write_all(buf).await.unwrap();
                             }
                             Terminate => {
                                 return;

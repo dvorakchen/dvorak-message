@@ -11,6 +11,8 @@ use super::client::ClientMessage;
 use super::dctor::Dctor;
 use std::{collections::HashMap, sync::Arc};
 
+/// Supervisor Sender, would kept at all clients,
+/// beause clients maybe communicat to other clients else
 pub type SupervisorSender = Arc<Sender<SupervisorMessage>>;
 
 /// Actor Message for ClientSupervisor
@@ -41,9 +43,13 @@ struct StoredClient {
     sender: Sender<ClientMessage>,
 }
 
-/// this actor manager all of clients
+/// this actor manager all of clients,
+/// Supervisor also called 'Parent Actor', is a specical Actor,
+/// This Supervisor, managed all of incoming clients
 pub struct ClientSupervisor {
+    /// all of the client those connecting
     clients: HashMap<String, StoredClient>,
+    /// inbox, all message sent to current Supervisor those unread would store here
     inbox: Receiver<<Self as Dctor>::InboxItem>,
     /// should keep a supervisor sender, for distribute to all clients
     sender: SupervisorSender,
@@ -78,6 +84,8 @@ impl Dctor for ClientSupervisor {
             println!("Supervisor received message: {:?}", msg);
             match msg {
                 NewClient(username, tcp_stream) => {
+                    // representing there is a new client incoming.
+                    // so construct a new Client that keeping owner TcpStream
                     let (mut client, client_sender) =
                         Client::new(tcp_stream, Arc::clone(&self.sender));
 
@@ -85,6 +93,7 @@ impl Dctor for ClientSupervisor {
                         client.listen().await;
                     });
 
+                    //  client menaged by clients of supervisor
                     self.clients.insert(
                         username,
                         StoredClient {
@@ -98,12 +107,15 @@ impl Dctor for ClientSupervisor {
                     receiver,
                     message,
                 } => {
+                    //  representing there is a new message need to forward to client else
                     if !self.clients.contains_key(&sender) || !self.clients.contains_key(&receiver)
                     {
                         continue;
                     }
 
+                    // take the receiver client from supervisor by name of receiver
                     let receiver = self.clients.get_mut(&receiver).unwrap();
+                    // send message to receiver's Client Actor
                     receiver
                         .sender
                         .send(ClientMessage::ReceiveMessage(sender, message))
