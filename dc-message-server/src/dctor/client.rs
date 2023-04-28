@@ -5,7 +5,6 @@ use super::{
 use async_trait::async_trait;
 use dvorak_message::message::{Message, MessageType};
 use tokio::{
-    io::AsyncWriteExt,
     net::TcpStream,
     sync::mpsc::{self, Sender},
 };

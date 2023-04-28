@@ -20,6 +20,7 @@ use super::supervisor::ClientSupervisor;
 /// ```
 pub struct Server {
     tcp_listener: TcpListener,
+    #[allow(dead_code)]
     supervisor_handler: JoinHandle<()>,
     supervisor_sender: SupervisorSender,
 }

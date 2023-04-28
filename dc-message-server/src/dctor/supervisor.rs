@@ -31,10 +31,12 @@ pub enum SupervisorMessage {
     /// representing client disconnecting to server
     DisconnectClient(String),
     /// close all of clients, and this Supervisor
+    #[allow(dead_code)]
     Terminate,
 }
 
 struct StoredClient {
+    #[allow(dead_code)]
     client: JoinHandle<()>,
     sender: Sender<ClientMessage>,
 }
