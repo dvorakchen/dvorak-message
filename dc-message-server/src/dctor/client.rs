@@ -114,9 +114,12 @@ impl Dctor for Client {
                     if let Some(msg) = msg {
                         match msg {
                             ReceiveMessage(sender, message) => {
-                                let data = format!("{{ sender: '{sender}', message: '{message}' }}");
-                                let buf = data.as_bytes();
-                                self.tcp_stream.write_all(buf).await.unwrap();
+                                let message = Message::new(MessageType::Text(message), sender, String::from("Self"));
+                                Message::send(&mut self.tcp_stream, message).await.unwrap();
+                                // let data = format!("{{ sender: '{sender}', message: '{message}' }}");
+                                // println!("Debug: Client in Server ReceiveMessage: {data}");
+                                // let buf = data.as_bytes();
+                                // self.tcp_stream.write_all(buf).await.unwrap();
                             }
                             Terminate => {
                                 return;

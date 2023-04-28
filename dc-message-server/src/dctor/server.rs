@@ -1,9 +1,6 @@
-use std::sync::Arc;
+use super::dctor::Dctor;
+use super::supervisor::{SupervisorMessage, SupervisorSender};
 
-use crate::{
-    dctor::Dctor,
-    supervisor::{SupervisorMessage, SupervisorSender},
-};
 use dvorak_message::message::{Message, MessageType};
 use tokio::{
     net::{TcpListener, TcpStream},

@@ -5,7 +5,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::client::Client;
+use super::client::Client;
 
 use super::client::ClientMessage;
 use super::dctor::Dctor;

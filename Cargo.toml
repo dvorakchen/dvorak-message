@@ -1,2 +1,2 @@
 [workspace]
-members = ["dvorak-message", "dc-message-server", "dc-message-client", "dctor"]
+members = ["dvorak-message", "dc-message-server", "dc-message-client"]

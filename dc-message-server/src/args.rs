@@ -13,7 +13,7 @@ impl Args {
                 Arg::new("listen lost")
                     .short('l')
                     .long("listen")
-                    .required(true),
+                    .default_value("127.0.0.1:8233"),
             )
             .get_matches();
 

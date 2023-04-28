@@ -21,6 +21,7 @@ pub use message_type::MessageType;
 
 const MESSAGE_TYPE_BYTE_LENGTH: usize = 1;
 const MESSAGE_USERNAME_LENGTH_BYTE_LENGTH: usize = 1;
+const MESSAGE_RECEIVER_LENGTH_BYTE_LENGTH: usize = 1;
 const MESSAGE_BODY_LENGTH_BYTE_LENGTH: usize = 4;
 const DEFAULT_BUFFER_CAPACITY: usize = 512;
 
@@ -99,20 +100,26 @@ impl Message {
 
         Message::varify_len(MESSAGE_TYPE_BYTE_LENGTH, bytes.len())?;
         let message_type = bytes.get_u8();
+        
         Message::varify_len(MESSAGE_USERNAME_LENGTH_BYTE_LENGTH, bytes.len())?;
         let username_len = bytes.get_u8();
+        
         Message::varify_len(username_len as usize, bytes.len())?;
         let username = bytes.split_to(username_len as usize);
         let username = String::from_utf8(username.to_vec()).unwrap();
-        Message::varify_len(MESSAGE_BODY_LENGTH_BYTE_LENGTH, bytes.len())?;
+        
+        Message::varify_len(MESSAGE_RECEIVER_LENGTH_BYTE_LENGTH, bytes.len())?;
 
         let receiver_len = bytes.get_u8();
+        
         Message::varify_len(receiver_len as usize, bytes.len())?;
         let receiver = bytes.split_to(receiver_len as usize);
         let receiver = String::from_utf8(receiver.to_vec()).unwrap();
+        
         Message::varify_len(MESSAGE_BODY_LENGTH_BYTE_LENGTH, bytes.len())?;
 
         let body_len = bytes.get_u32();
+        
         Message::varify_len(body_len as usize, bytes.len())?;
         let body = bytes.split_to(body_len as usize);
 
