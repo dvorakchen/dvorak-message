@@ -121,6 +121,7 @@ impl Dctor for Client {
                                 // self.tcp_stream.write_all(buf).await.unwrap();
                             }
                             Terminate => {
+                                println!("Client terminated.");
                                 return;
                             }
                         }

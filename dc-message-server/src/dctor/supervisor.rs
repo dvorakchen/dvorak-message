@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use tokio::{
     net::TcpStream,
-    sync::mpsc::{self, Receiver, Sender},
-    task::JoinHandle,
+    sync::mpsc::{self, Receiver, Sender}
 };
 
 use super::client::Client;
@@ -31,19 +30,12 @@ pub enum SupervisorMessage {
     /// representing client disconnecting to server
     DisconnectClient(String),
     /// close all of clients, and this Supervisor
-    #[allow(dead_code)]
     Terminate,
-}
-
-struct StoredClient {
-    #[allow(dead_code)]
-    client: JoinHandle<()>,
-    sender: Sender<ClientMessage>,
 }
 
 /// this actor manager all of clients
 pub struct ClientSupervisor {
-    clients: HashMap<String, StoredClient>,
+    clients: HashMap<String, Sender<ClientMessage>>,
     inbox: Receiver<<Self as Dctor>::InboxItem>,
     /// should keep a supervisor sender, for distribute to all clients
     sender: SupervisorSender,
@@ -81,16 +73,13 @@ impl Dctor for ClientSupervisor {
                     let (mut client, client_sender) =
                         Client::new(tcp_stream, Arc::clone(&self.sender));
 
-                    let handle = tokio::spawn(async move {
+                    tokio::spawn(async move {
                         client.listen().await;
                     });
 
                     self.clients.insert(
                         username,
-                        StoredClient {
-                            client: handle,
-                            sender: client_sender,
-                        },
+                        client_sender,
                     );
                 }
                 Message {
@@ -105,28 +94,28 @@ impl Dctor for ClientSupervisor {
 
                     let receiver = self.clients.get_mut(&receiver).unwrap();
                     receiver
-                        .sender
                         .send(ClientMessage::ReceiveMessage(sender, message))
                         .await
                         .unwrap();
                 }
                 DisconnectClient(username) => {
                     if let Some(client) = self.clients.remove(&username) {
-                        client.sender.send(ClientMessage::Terminate).await.unwrap();
+                        client.send(ClientMessage::Terminate).await.unwrap();
                     }
                 }
                 Terminate => {
-                    for (_, stored_client) in self.clients.iter_mut() {
+                    for (username, stored_client) in self.clients.iter_mut() {
+                        println!("{username} terminating...");
                         stored_client
-                            .sender
                             .send(ClientMessage::Terminate)
                             .await
                             .unwrap();
                     }
                     self.clients.clear();
+                    println!("Supervisor terminated.");
                     break 'listen;
                 }
             }
-        }
+        }        
     }
 }

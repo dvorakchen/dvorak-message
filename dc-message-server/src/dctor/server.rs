@@ -1,10 +1,15 @@
+use std::sync::Arc;
+
 use super::dctor::Dctor;
 use super::supervisor::{SupervisorMessage, SupervisorSender};
 
 use dvorak_message::message::{Message, MessageType};
+use tokio::io::{stdin, AsyncBufReadExt};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::{
+    io::BufReader,
     net::{TcpListener, TcpStream},
-    task::JoinHandle,
 };
 
 use super::supervisor::ClientSupervisor;
@@ -20,9 +25,9 @@ use super::supervisor::ClientSupervisor;
 /// ```
 pub struct Server {
     tcp_listener: TcpListener,
-    #[allow(dead_code)]
-    supervisor_handler: JoinHandle<()>,
     supervisor_sender: SupervisorSender,
+    sender: Arc<Sender<bool>>,
+    inbox: Receiver<bool>,
 }
 
 impl Server {
@@ -30,48 +35,91 @@ impl Server {
     pub async fn new(host: &str) -> Self {
         let tcp_listener = TcpListener::bind(host).await.unwrap();
         let (mut client_supervisor, supervisor_sender) = ClientSupervisor::new();
+        let (tx, rx) = mpsc::channel(1);
 
-        let supervisor_handler = tokio::spawn(async move {
+        tokio::spawn(async move {
             client_supervisor.listen().await;
         });
 
         println!("Server construct.");
         Server {
             tcp_listener,
-            supervisor_handler,
             supervisor_sender,
+            sender: Arc::new(tx),
+            inbox: rx,
         }
     }
 
     pub async fn listen(&mut self) {
         println!("Server Listening...");
+
+        let input_handler = {
+            let supervisor_sender = Arc::clone(&self.supervisor_sender);
+            let server_sender = Arc::clone(&self.sender);
+            tokio::spawn(async {
+                Self::listen_input(supervisor_sender, server_sender).await;
+            })
+        };
+
+        self.listen_incoming_client().await;
+
+        input_handler.await.unwrap();
+    }
+
+    /// listen clients, and forward to supervisor
+    async fn listen_incoming_client(&mut self) {
         loop {
-            let (mut incoming_client, socket) = self.tcp_listener.accept().await.unwrap();
+            tokio::select! {
+                tcp_message = self.tcp_listener.accept() => {
+                    let (mut incoming_client, socket) = tcp_message.unwrap();
 
-            println!("Client incoming: {socket}");
+                    println!("Client incoming: {socket}");
 
-            let first = Server::check_login(&mut incoming_client).await;
-            if first.is_err() {
-                Message::send(
-                    &mut incoming_client,
-                    Message::new(
-                        MessageType::Text("need login".to_string()),
-                        "<Server>".to_string(),
-                        String::new(),
-                    ),
-                )
-                .await
-                .unwrap();
-                continue;
+                    let first = Server::check_login(&mut incoming_client).await;
+                    if first.is_err() {
+                        Message::send(
+                            &mut incoming_client,
+                            Message::new(
+                                MessageType::Text("need login".to_string()),
+                                "<Server>".to_string(),
+                                String::new(),
+                            ),
+                        )
+                        .await
+                        .unwrap();
+                        continue;
+                    };
+                    let username = first.unwrap();
+                    println!("Client login success: {username}");
+
+                    println!("Send message to supervisor");
+                    self.supervisor_sender
+                        .send(SupervisorMessage::NewClient(username, incoming_client))
+                        .await
+                        .unwrap();
+                }
+                is_quit = (self.inbox.recv()) => {
+                    if let Some(true) = is_quit {
+                        println!("Server received: QUIT, Server quit. Bye!");
+                        break;
+                    }
+                }
             };
-            let username = first.unwrap();
-            println!("Client login success: {username}");
+        }
+    }
 
-            println!("Send message to supervisor");
-            self.supervisor_sender
-                .send(SupervisorMessage::NewClient(username, incoming_client))
-                .await
-                .unwrap();
+    /// if user type 'quit' in terminal, quit the application
+    async fn listen_input(supervisor_sender: SupervisorSender, server_sender: Arc<Sender<bool>>) {
+        let mut lines = BufReader::new(stdin()).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            if line.trim() == "quit" {
+                server_sender.send(true).await.unwrap();
+                supervisor_sender
+                    .send(SupervisorMessage::Terminate)
+                    .await
+                    .unwrap();
+                return;
+            }
         }
     }
 
