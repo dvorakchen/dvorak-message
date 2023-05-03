@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use tokio::{
     net::TcpStream,
-    sync::mpsc::{self, Receiver, Sender}
+    sync::mpsc::{self, Receiver, Sender},
 };
 
 use super::client::Client;
@@ -77,10 +77,7 @@ impl Dctor for ClientSupervisor {
                         client.listen().await;
                     });
 
-                    self.clients.insert(
-                        username,
-                        client_sender,
-                    );
+                    self.clients.insert(username, client_sender);
                 }
                 Message {
                     sender,
@@ -106,16 +103,13 @@ impl Dctor for ClientSupervisor {
                 Terminate => {
                     for (username, stored_client) in self.clients.iter_mut() {
                         println!("{username} terminating...");
-                        stored_client
-                            .send(ClientMessage::Terminate)
-                            .await
-                            .unwrap();
+                        stored_client.send(ClientMessage::Terminate).await.unwrap();
                     }
                     self.clients.clear();
                     println!("Supervisor terminated.");
                     break 'listen;
                 }
             }
-        }        
+        }
     }
 }

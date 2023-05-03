@@ -42,7 +42,7 @@ impl Client {
     }
 
     /// handle incoming message
-    /// 
+    ///
     /// # Return
     /// is terminate the listen?
     async fn handle_incoming_message(&mut self, message: Message) -> bool {
@@ -104,7 +104,7 @@ impl Dctor for Client {
                     let message = msg.unwrap();
                     println!("Client received message");
                     let is_break = self.handle_incoming_message(message).await;
-                    
+
                     if is_break {
                         break;
                     }
